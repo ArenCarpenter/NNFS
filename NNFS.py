@@ -115,10 +115,12 @@ class Layer_Dense:
         self.output = np.dot(inputs, self.weights) + self.biases
 
 
-layer1 = Layer_Dense(4, 5)  # output here is input to layer2 so need to match
+layer1 = Layer_Dense(2, 5)  # output here is input to layer2 so need to match
 # layer2 = Layer_Dense(5, 2)
-
+activation1 = Activation_ReLU()
 layer1.forward(X)
+activation1.forward(layer1.output)
+print(activation1.output)
 # layer2.forward(layer1.output)
 
 
