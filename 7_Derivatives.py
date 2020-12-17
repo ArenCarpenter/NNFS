@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 def f(x):
     return 2 * x
+
 
 x = np.array(range(5))
 y = f(x)
@@ -12,8 +14,10 @@ y = f(x)
 
 print((y[1] - y[0]) / (x[1] - x[0]))
 
+
 def f_2(x):
     return 2 * x ** 2
+
 
 y = f_2(x)
 print(x)
@@ -30,8 +34,10 @@ print(approximate_derivative)
 
 # Numerical Differentiation
 
+
 def f(x):
     return 2 * x ** 2
+
 
 x = np.arange(0, 5, 0.001)
 y = f(x)
@@ -39,11 +45,14 @@ plt.plot(x, y)
 
 colors = ['k', 'g', 'r', 'b', 'c']
 
+
 def tangent_line(x):
     return approximate_derivative * x + b
 
+
 def approximate_tangent_line(x, approximate_derivative):
     return (approximate_derivative * x) + b
+
 
 for i in range(5):
     p2_delta = 0.0001
