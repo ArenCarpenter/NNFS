@@ -44,6 +44,18 @@ class Activation_Softmax:
         probabilities = exp_values / np.sum(exp_values, axis=1, keepdims=True)
         self.output = probabilities
 
+    def backward(self, dvalues):
+        # Create uninitialized array
+        self.dinputs = np.empty_like(dvalues)
+        # Enumerate outputs and gradients
+        for index, (single_output, single_dvalues) in enumerate(zip(self.output, dvalues)):
+            # Flatten output array
+            single_output = single.output.reshape(-1, 1)
+            # Calculate Jacobian matrix of the output
+            jacobian_matrix = np.diagflat(single_output) - np.dot(single_output, single_output.T)
+            # Calculate sample-wise gradient, and add to array of sample gradients
+            self.dinputs[index] = np.dot(jacobian_matrix, single_dvalues)
+
 
 class Loss:
     # Calculate the data and regularization losses given model output and true values
@@ -71,6 +83,17 @@ class Loss_CategoricalCrossentropy(Loss):
         # Losses
         negative_log_likelihoods = -np.log(correct_confidences)
         return negative_log_likelihoods
+
+    def backward(self, dvalues, y_true):
+        samples = len(dvalues)
+        labels = len(dvalues[0])
+        # If labels are sparse, one-hot encode
+        if len(y_true.shape) == 1:
+            y_true = np.eye(labels)[y_true]
+        # Calculate gradient
+        self.dinputs = -y_true / dvalues
+        # Normalize gradient
+        self.dinputs = self.dinputs / samples
 
 
 X, y = spiral_data(100, 3)
