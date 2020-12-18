@@ -68,18 +68,14 @@ class Loss:
 class Loss_CategoricalCrossentropy(Loss):
     def forward(self, y_pred, y_true):
         samples = len(y_pred)
-
         # Clip data to prevent division by 0, and clip both pos and neg to not drag mean
         y_pred_clipped = np.clip(y_pred, 1e-7, 1 - 1e-7)
-
         # Probabilities for target values - if categorical labels
         if len(y_true.shape) == 1:
             correct_confidences = y_pred_clipped[range(samples), y_true]
-
         # If one-hot encoded labels
         elif len(y_true.shape) == 2:
             correct_confidences = np.sum(y_pred_clipped * y_true, axis=1)
-
         # Losses
         negative_log_likelihoods = -np.log(correct_confidences)
         return negative_log_likelihoods
@@ -128,9 +124,7 @@ activation1 = Activation_ReLU()
 
 dense2 = Layer_Dense(3, 3)
 
-activation2 = Activation_Softmax()
-
-loss_function = Loss_CategoricalCrossentropy()
+loss_activation = Activation_Softmax_Loss_CategoricalCrossentropy()
 
 dense1.forward(X)
 
@@ -138,19 +132,25 @@ activation1.forward(dense1.output)
 
 dense2.forward(activation1.output)
 
-activation2.forward(dense2.output)
+loss = loss_activation.forward(dense2.output, y)
 
-print(activation2.output[:5])
+print(loss_activation.output[:5])
 
-loss = loss_function.calculate(activation2.output, y)
+print("loss: ", loss)
 
-print('Loss: ', loss)
-
-# Calculate accuracy from output of activation2 and targets
-predictions = np.argmax(activation2.output, axis=1)
-
+predictions = np.argmax(loss_activation.output, axis=1)
 if len(y.shape) == 2:
     y = np.argmax(y, axis=1)
-
 accuracy = np.mean(predictions == y)
-print('Accuracy:', accuracy)
+
+print("acc: ", accuracy)
+
+loss_activation.backward(loss_activation.output, y)
+dense2.backward(loss_activation.dinputs)
+activation1.backward(dense2.dinputs)
+dense1.backward(activation1.dinputs)
+
+print(dense1.dweights)
+print(dense1.dbiases)
+print(dense2.dweights)
+print(dense2.dbiases)
