@@ -116,41 +116,51 @@ class Activation_Softmax_Loss_CategoricalCrossentropy():
         self.dinputs = self.dinputs / samples
 
 
+class Optimizer_SGD:
+    def __init__(self, learning_rate=1.0):
+        self.learning_rate = learning_rate
+
+    def update_params(self, layer):
+        layer.weights += -self.learning_rate * layer.dweights
+        layer.biases += -self.learning_rate * layer.dbiases
+
+
 X, y = spiral_data(100, 3)
 
-dense1 = Layer_Dense(2, 3)
+dense1 = Layer_Dense(2, 64)
 
 activation1 = Activation_ReLU()
 
-dense2 = Layer_Dense(3, 3)
+dense2 = Layer_Dense(64, 3)
 
 loss_activation = Activation_Softmax_Loss_CategoricalCrossentropy()
 
-dense1.forward(X)
+optimizer = Optimizer_SGD()
 
-activation1.forward(dense1.output)
+for epoch in range(10001):
 
-dense2.forward(activation1.output)
+    dense1.forward(X)
 
-loss = loss_activation.forward(dense2.output, y)
+    activation1.forward(dense1.output)
 
-print(loss_activation.output[:5])
+    dense2.forward(activation1.output)
 
-print("loss: ", loss)
+    loss = loss_activation.forward(dense2.output, y)
 
-predictions = np.argmax(loss_activation.output, axis=1)
-if len(y.shape) == 2:
-    y = np.argmax(y, axis=1)
-accuracy = np.mean(predictions == y)
+    predictions = np.argmax(loss_activation.output, axis=1)
+    if len(y.shape) == 2:
+        y = np.argmax(y, axis=1)
+    accuracy = np.mean(predictions == y)
 
-print("acc: ", accuracy)
+    if not epoch % 100:
+        print(f'epoch: {epoch}, ' +
+              f'acc: {accuracy:.3f}, ' +
+              f'loss: {loss:.3f}')
 
-loss_activation.backward(loss_activation.output, y)
-dense2.backward(loss_activation.dinputs)
-activation1.backward(dense2.dinputs)
-dense1.backward(activation1.dinputs)
+    loss_activation.backward(loss_activation.output, y)
+    dense2.backward(loss_activation.dinputs)
+    activation1.backward(dense2.dinputs)
+    dense1.backward(activation1.dinputs)
 
-print(dense1.dweights)
-print(dense1.dbiases)
-print(dense2.dweights)
-print(dense2.dbiases)
+    optimizer.update_params(dense1)
+    optimizer.update_params(dense2)
