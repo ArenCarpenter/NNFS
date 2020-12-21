@@ -7,10 +7,17 @@ nnfs.init()
 
 
 class Layer_Dense:
-    def __init__(self, n_inputs, n_neurons):
+    def __init__(self, n_inputs, n_neurons,
+                 weight_regularizer_l1=0, weight_regularizer_l2=0,
+                 bias_regularizer_l1=0, bias_regularizer_l2=0):
         # Initialize weights and biases
         self.weights = 0.10 * np.random.randn(n_inputs, n_neurons)  # 0.10 to scale, define as inp, neur so no transpose
         self.biases = np.zeros((1, n_neurons))
+        # L1 and L2
+        self.weight_regularizer_l1 = weight_regularizer_l1
+        self.weight_regularizer_l2 = weight_regularizer_l2
+        self.bias_regularizer_l1 = bias_regularizer_l1
+        self.bias_regularizer_l2 = bias_regularizer_l2
 
     def forward(self, inputs):
         # Calculate output values from inputs, weights, and biases
@@ -21,6 +28,19 @@ class Layer_Dense:
         # Gradient on parameters
         self.dweights = np.dot(self.inputs.T, dvalues)
         self.dbiases = np.sum(dvalues, axis=0, keepdims=True)
+        # Gradient on regularization
+        if self.weight_regularizer_l1 > 0:
+            dL1 = np.ones_like(self.weights)
+            dL1[self.weights < 0] = -1
+            self.dweights += self.weight_regularizer_l1 * dL1
+        if self.weight_regularizer_l2 > 0:
+            self.dweights += 2 * self.weight_regularizer_l2 * self.weights
+        if self.bias_regularizer_l1 > 0:
+            dL1 = np.ones_like(self.biases)
+            dL1[self.biases < 0] = -1
+            self.dbiases += self.bias_regularizer_l1 * dL1
+        if self.bias_regularizer_l2 > 0:
+            self.dbiases += 2 * self.bias_regularizer_l2 * self.biases
         # Gradient on values
         self.dinputs = np.dot(dvalues, self.weights.T)
 
@@ -195,6 +215,18 @@ class Loss:
         data_loss = np.mean(sample_losses)
         return data_loss
 
+    def regularization_loss(self, layer):
+        regularization_loss = 0
+        if layer.weight_regularizer_l1 > 0:
+            regularization_loss += layer.weight_regularizer_l1 * np.sum(np.abs(layer.weights))
+        if layer.weight_regularizer_l2 > 0:
+            regularization_loss += layer.weight_regularizer_l2 * np.sum(layer.weights * layer.weights)
+        if layer.bias_regularizer_l1 > 0:
+            regularization_loss += layer.bias_regularizer_l1 * np.sum(np.abs(layer.biases))
+        if layer.bias_regularizer_l2 > 0:
+            regularization_loss += layer.bias_regularizer_l2 * np.sum(layer.biases * layer.biases)
+        return regularization_loss
+
 
 class Loss_CategoricalCrossentropy(Loss):
     def forward(self, y_pred, y_true):
@@ -249,7 +281,7 @@ class Activation_Softmax_Loss_CategoricalCrossentropy():
 
 X, y = spiral_data(100, 3)
 
-dense1 = Layer_Dense(2, 64)
+dense1 = Layer_Dense(2, 64, weight_regularizer_l2=5e-4, bias_regularizer_l2=5e-4)
 
 activation1 = Activation_ReLU()
 
@@ -257,7 +289,7 @@ dense2 = Layer_Dense(64, 3)
 
 loss_activation = Activation_Softmax_Loss_CategoricalCrossentropy()
 
-optimizer = Optimizer_Adam(learning_rate=0.05, decay=5e-7)
+optimizer = Optimizer_Adam(learning_rate=0.02, decay=5e-7)
 
 for epoch in range(10001):
 
@@ -267,7 +299,12 @@ for epoch in range(10001):
 
     dense2.forward(activation1.output)
 
-    loss = loss_activation.forward(dense2.output, y)
+    data_loss = loss_activation.forward(dense2.output, y)
+
+    regularization_loss = loss_activation.loss.regularization_loss(dense1) + \
+                          loss_activation.loss.regularization_loss(dense2)
+
+    loss = data_loss + regularization_loss
 
     predictions = np.argmax(loss_activation.output, axis=1)
     if len(y.shape) == 2:
@@ -277,7 +314,9 @@ for epoch in range(10001):
     if not epoch % 100:
         print(f'epoch: {epoch}, ' +
               f'acc: {accuracy:.3f}, ' +
-              f'loss: {loss:.3f}, ' +
+              f'loss: {loss:.3f}, (' +
+              f'data_loss: {data_loss:.3f}, ' +
+              f'reg_loss: {regularization_loss:.3f}), ' +
               f'lr: {optimizer.current_learning_rate}')
 
     loss_activation.backward(loss_activation.output, y)
