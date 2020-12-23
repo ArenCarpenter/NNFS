@@ -325,6 +325,20 @@ class Loss_MeanSquaredError(Loss):
         self.dinputs = self.dinputs / samples
 
 
+class Loss_MeanAbsoluteError(Loss):
+    def forward(self, y_pred, y_true):
+        sample_losses = np.mean(np.abs(y_true - y_pred), axis=-1)
+        return sample_losses
+
+    def backward(self, dvalues, y_true):
+        samples = len(dvalues)
+        outputs = len(dvalues[0])
+        # Calculate gradient
+        self.dinputs = np.sign(y_true - dvalues) / outputs
+        # Normalize gradient
+        self.dinputs = self.dinputs / samples
+
+
 class Activation_Softmax_Loss_CategoricalCrossentropy():
     def __init__(self):
         self.activation = Activation_Softmax()
