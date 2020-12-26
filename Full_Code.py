@@ -538,29 +538,8 @@ class Model:
                 f'data_loss: {epoch_data_loss:.3f}, ' +
                 f'reg_loss: {epoch_regularization_loss:.3f}), ' +
                 f'lr: {self.optimizer.current_learning_rate}')
-
-            if validation_data is not None:
-                self.loss.new_pass()
-                self.accuracy.new_pass()
-
-                for step in range(validation_steps):
-                    if batch_size is None:
-                        batch_X = X_val
-                        batch_y = y_val
-                    else:
-                        batch_X = X_val[step * batch_size:(step+1) * batch_size]
-                        batch_y = y_val[step * batch_size:(step+1) * batch_size]
-                    output = self.forward(batch_X, training=False)
-                    self.loss.calculate(output, batch_y)
-                    predictions = self.output_layer_activation.predictions(output)
-                    self.accuracy.calculate(predictions, batch_y)
-
-                validation_loss = self.loss.calculate_accumulated()
-                validation_accuracy = self.accuracy.calculate_accumulated()
-
-                print(f'validation, ' +
-                    f'acc: {validation_accuracy:.3f}, ' +
-                    f'loss: {validation_loss:.3f}')
+        if validation_data is not None:
+            self.evaluate(*validation_data, batch_size=batch_size)
 
     def forward(self, X, training):
         # Call forward method on the input layer
@@ -586,6 +565,35 @@ class Model:
         self.loss.backward(output, y)
         for layer in reversed(self.layers):
             layer.backward(layer.next.dinputs)
+
+    def evaluate(self, X_val, y_val, *, batch_size=None):
+        validation_steps = 1
+        if batch_size is not None:
+            validation_steps = len(X_val) // batch_size
+            if validation_steps * batch_size < len(X_val):
+                validation_steps += 1
+
+        self.loss.new_pass()
+        self.accuracy.new_pass()
+
+        for step in range(validation_steps):
+            if batch_size is None:
+                batch_X = X_val
+                batch_y = y_val
+            else:
+                batch_X = X_val[step * batch_size:(step + 1) * batch_size]
+                batch_y = y_val[step * batch_size:(step + 1) * batch_size]
+            output = self.forward(batch_X, training=False)
+            self.loss.calculate(output, batch_y)
+            predictions = self.output_layer_activation.predictions(output)
+            self.accuracy.calculate(predictions, batch_y)
+
+        validation_loss = self.loss.calculate_accumulated()
+        validation_accuracy = self.accuracy.calculate_accumulated()
+
+        print(f'validation, ' +
+            f'acc: {validation_accuracy:.3f}, ' +
+            f'loss: {validation_loss:.3f}')
 
 
 def load_mnist_dataset(dataset, path):
@@ -636,6 +644,7 @@ model.finalize()
 
 model.train(X, y, validation_data=(X_test, y_test), epochs=10, batch_size=128, print_every=100)
 
+model.evaluate(X_test, y_test )
 
 # Regression with the model object
 # X, y = spiral_data(samples=1000, classes=3)
