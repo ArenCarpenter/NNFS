@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# 
+.DS_Store
+
+# Data
+fashion_mnist_images/
+
 # C extensions
 *.so
 
