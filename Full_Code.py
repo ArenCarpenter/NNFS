@@ -4,6 +4,7 @@ import nnfs
 import os
 import cv2
 import pickle
+import copy
 
 nnfs.init()
 
@@ -625,6 +626,45 @@ class Model:
         with open(path, 'rb') as f:
             self.set_parameters(pickle.load(f))
 
+    def save(self, path):
+        model = copy.deepcopy(self)
+        # Reset accumulated values
+        model.loss.new_pass()
+        model.accuracy.new_pass()
+        # Remove data from input layer and gradients from the loss object
+        model.input_layer.__dict__.pop('output', None)
+        model.loss.__dict__.pop('dinputs', None)
+        # For each layer, remove inputs, output and dinputs
+        for layer in model.layers:
+            for property in ['inputs', 'output', 'dinputs', 'dweights', 'dbiases']:
+                layer.__dict__.pop(property, None)
+        # Save the model
+        with open(path, 'wb') as f:
+            pickle.dump(model, f)
+
+    @staticmethod
+    def load(path):
+        with open(path, 'rb') as f:
+            model = pickle.load(f)
+        return model
+
+    def predict(self, X, *, batch_size=None):
+        # Default value if batch size is not being set
+        prediction_steps = 1
+        if batch_size is not None:
+            prediction_steps = len(X) // batch_size
+            if prediction_steps * batch_size < len(X):
+                prediction_steps += 1
+        output = []
+        for step in range(prediction_steps):
+            if batch_size is None:
+                batch_X = X
+            else:
+                batch_X = X[step * batch_size:(step + 1) * batch_size]
+            batch_output = self.forward(batch_X, training=False)
+            output.append(batch_output)
+        return np.vstack(output)
+
 
 def load_mnist_dataset(dataset, path):
     labels = os.listdir(os.path.join(path, dataset))
@@ -647,50 +687,12 @@ def create_data_mnist(path):
 ###
 X, y, X_test, y_test = create_data_mnist('fashion_mnist_images')
 
-keys = np.array(range(X.shape[0]))
-np.random.shuffle(keys)
-X = X[keys]
-y = y[keys]
-
-X = (X.reshape(X.shape[0], -1).astype(np.float32) - 127.5) / 127.5
 X_test = (X_test.reshape(X_test.shape[0], -1).astype(np.float32) - 127.5) / 127.5
 
-model =  Model()
+model = Model.load('fashion_mnist.model')
 
-model.add(Layer_Dense(X.shape[1], 128))
-model.add(Activation_ReLU())
-model.add(Layer_Dense(128, 128))
-model.add(Activation_ReLU())
-model.add(Layer_Dense(128, 10))
-model.add(Activation_Softmax())
+confidences = model.predict(X_test[:5])
+predictions = model.output_layer_activation.predictions(confidences)
+print(predictions)
 
-model.set(
-loss=Loss_CategoricalCrossentropy(),
-optimizer=Optimizer_Adam(decay=1e-3),
-accuracy=Accuracy_Categorical()
-)
-
-model.finalize()
-
-model.train(X, y, validation_data=(X_test, y_test), epochs=10, batch_size=128, print_every=100)
-
-parameters = model.get_parameters()
-
-model = Model()
-
-model.add(Layer_Dense(X.shape[1], 128))
-model.add(Activation_ReLU())
-model.add(Layer_Dense(128, 128))
-model.add(Activation_ReLU())
-model.add(Layer_Dense(128, 10))
-model.add(Activation_Softmax())
-
-model.set(loss=Loss_CategoricalCrossentropy(), accuracy=Accuracy_Categorical())
-
-model.finalize()
-
-model.set_parameters(parameters)
-
-model.evaluate(X_test, y_test)
-
-model.save_parameters('fashion_mnist.parms')
+print(y_test[:5])
