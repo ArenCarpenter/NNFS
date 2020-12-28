@@ -3,6 +3,7 @@ import numpy as np
 import nnfs
 import os
 import cv2
+import pickle
 
 nnfs.init()
 
@@ -44,6 +45,13 @@ class Layer_Dense:
             self.dbiases += 2 * self.bias_regularizer_l2 * self.biases
         # Gradient on values
         self.dinputs = np.dot(dvalues, self.weights.T)
+
+    def get_parameters(self):
+        return self.weights, self.biases
+
+    def set_parameters(self, weights, biases):
+        self.weights = weights
+        self.biases = biases
 
 
 class Layer_Dropout:
@@ -441,10 +449,13 @@ class Model:
     def add(self, layer):
         self.layers.append(layer)
 
-    def set(self, *, loss, optimizer, accuracy):
-        self.loss = loss
-        self.optimizer = optimizer
-        self.accuracy = accuracy
+    def set(self, *, loss=None, optimizer=None, accuracy=None):
+        if loss is not None:
+            self.loss = loss
+        if optimizer is not None:
+            self.optimizer = optimizer
+        if accuracy is not None:
+            self.accuracy = accuracy
 
     def finalize(self):
         # Create and set the input layer
@@ -466,7 +477,8 @@ class Model:
             if hasattr(self.layers[i], 'weights'):
                 self.trainable_layers.append(self.layers[i])
         # Update loss object with trainable layers
-        self.loss.remember_trainable_layers(self.trainable_layers)
+        if self.loss is not None:
+            self.loss.remember_trainable_layers(self.trainable_layers)
         # Refactor Softmax/CategoricalCrossEntropy
         if isinstance(self.layers[-1], Activation_Softmax) and \
             isinstance(self.loss, Loss_CategoricalCrossentropy):
@@ -595,6 +607,24 @@ class Model:
             f'acc: {validation_accuracy:.3f}, ' +
             f'loss: {validation_loss:.3f}')
 
+    def get_parameters(self):
+        parameters = []
+        for layer in self.trainable_layers:
+            parameters.append(layer.get_parameters())
+        return parameters
+
+    def set_parameters(self, parameters):
+        for parameter_set, layer in zip(parameters, self.trainable_layers):
+            layer.set_parameters(*parameter_set)
+
+    def save_parameters(self, path):
+        with open(path, 'wb') as f:
+            pickle.dump(self.get_parameters(), f)
+
+    def load_parameters(self, path):
+        with open(path, 'rb') as f:
+            self.set_parameters(pickle.load(f))
+
 
 def load_mnist_dataset(dataset, path):
     labels = os.listdir(os.path.join(path, dataset))
@@ -644,24 +674,23 @@ model.finalize()
 
 model.train(X, y, validation_data=(X_test, y_test), epochs=10, batch_size=128, print_every=100)
 
-model.evaluate(X_test, y_test )
+parameters = model.get_parameters()
 
-# Regression with the model object
-# X, y = spiral_data(samples=1000, classes=3)
-# X_val, y_val = spiral_data(samples=100, classes=3)
-# # Instantiate the model
-# model = Model()
-# # Add layers
-# model.add(Layer_Dense(2, 512, weight_regularizer_l2=5e-4, bias_regularizer_l2=5e-4))
-# model.add(Activation_ReLU())
-# model.add(Layer_Dropout(0.1))
-# model.add(Layer_Dense(512, 3))
-# model.add(Activation_Softmax())
-# # Set loss, optimizer and accuracy objects
-# model.set(loss=Loss_CategoricalCrossentropy(),
-#           optimizer=Optimizer_Adam(learning_rate=0.03, decay=5e-5),
-#           accuracy=Accuracy_Categorical())
-# # Finalize the model
-# model.finalize()
-# # Train the model
-# model.train(X, y, validation_data=(X_val, y_val), epochs=10000, print_every=100)
+model = Model()
+
+model.add(Layer_Dense(X.shape[1], 128))
+model.add(Activation_ReLU())
+model.add(Layer_Dense(128, 128))
+model.add(Activation_ReLU())
+model.add(Layer_Dense(128, 10))
+model.add(Activation_Softmax())
+
+model.set(loss=Loss_CategoricalCrossentropy(), accuracy=Accuracy_Categorical())
+
+model.finalize()
+
+model.set_parameters(parameters)
+
+model.evaluate(X_test, y_test)
+
+model.save_parameters('fashion_mnist.parms')
