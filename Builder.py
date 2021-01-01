@@ -683,16 +683,3 @@ def create_data_mnist(path):
     X, y = load_mnist_dataset('train', path)
     X_test, y_test = load_mnist_dataset('test', path)
     return X, y, X_test, y_test
-
-###
-X, y, X_test, y_test = create_data_mnist('fashion_mnist_images')
-
-X_test = (X_test.reshape(X_test.shape[0], -1).astype(np.float32) - 127.5) / 127.5
-
-model = Model.load('fashion_mnist.model')
-
-confidences = model.predict(X_test[:5])
-predictions = model.output_layer_activation.predictions(confidences)
-print(predictions)
-
-print(y_test[:5])
