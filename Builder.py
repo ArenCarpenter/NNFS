@@ -388,7 +388,7 @@ class Loss_MeanAbsoluteError(Loss):
         self.dinputs = self.dinputs / samples
 
 
-class Activation_Softmax_Loss_CategoricalCrossentropy():
+class Activation_Softmax_Loss_CategoricalCrossentropy:
     def backward(self, dvalues, y_true):
         samples = len(dvalues)
         if len(y_true.shape) == 2:
